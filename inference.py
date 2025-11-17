@@ -1,13 +1,13 @@
 import torch
 from diffusers import StableDiffusionPipeline
 from PIL import Image
-from safetensors.torch import load_file 
+# from safetensors.torch import load_file 
 
 from stable_diffusion import MiniDiffusionPipeline
 
 # --- Cấu hình ---
-PROMPT = "a woman smiling, pointy nose, wavy hair"
-SAVE_IMAGE_PATH = "./generated_image.png"
+PROMPT = "beautiful woman with long braided hair, wearing a scarf, soft smile, looking down, detailed shading"
+SAVE_IMAGE_PATH = "./generated_image_v3.png"
 
 UNET_SAFE_PATH = "./unet-mini.safetensors"
 VAE_SAFE_PATH = "./vae-finetuned.safetensors"
@@ -37,7 +37,7 @@ def main():
     # Tải UNet
     print(f"Đang tải trọng số UNet từ {UNET_SAFE_PATH}...")
     try:
-        unet_weights = load_file(UNET_SAFE_PATH, device=DEVICE)
+        unet_weights = torch.load(UNET_SAFE_PATH, map_location=DEVICE)
         container.unet.load_state_dict(unet_weights)
     except Exception as e:
         print(f"LỖI: Không thể tải UNet state dict: {e}")
@@ -47,7 +47,7 @@ def main():
     # Tải VAE
     print(f"Đang tải trọng số VAE từ {VAE_SAFE_PATH}...")
     try:
-        vae_weights = load_file(VAE_SAFE_PATH, device=DEVICE)
+        vae_weights = torch.load(VAE_SAFE_PATH, map_location=DEVICE)
         container.vae.load_state_dict(vae_weights)
     except Exception as e:
         print(f"LỖI: Không thể tải VAE state dict: {e}")
