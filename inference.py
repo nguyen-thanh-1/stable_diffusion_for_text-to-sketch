@@ -66,7 +66,7 @@ def main():
         safety_checker=None,
         feature_extractor=None,
     ).to(DEVICE) 
-    r
+
     if DEVICE.startswith("cuda"):
          inference_pipeline.to(dtype=torch_dtype)
 
