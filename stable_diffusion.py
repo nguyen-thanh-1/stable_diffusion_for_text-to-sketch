@@ -5,12 +5,9 @@ from transformers import CLIPTextModel, CLIPTokenizer
 from typing import Dict, Any, Optional
 
 class MiniDiffusionPipeline:
-    """
-    Một class "pipeline" tùy chỉnh để gom UNet "mini", VAE, CLIP
-    và các cấu hình training/diffusion.
-    """
+
     
-    # Lấy config mặc định bạn cung cấp
+    # config mặc định
     DEFAULT_CONFIG: Dict[str, Any] = {
         "beta_schedule": "scaled_linear",
         "beta_start": 0.00085,
@@ -30,9 +27,8 @@ class MiniDiffusionPipeline:
         "latent_channels": 4,
         "latent_downscale_factor": 8,
         
-        # --- Bổ sung: Cấu hình kiến trúc UNet-mini ---
-        # (Bạn có thể ghi đè chúng bằng 'config_overrides')
-        "image_size": 128, # Kích thước ảnh gốc
+        # --- Cấu hình kiến trúc UNet-mini ---
+        "image_size": 128, 
         "unet_block_out_channels": (256, 512, 1024),
         "unet_layers_per_block": 1,
         "unet_down_block_types": (
@@ -56,30 +52,14 @@ class MiniDiffusionPipeline:
         device: str = "cpu",
         config_overrides: Optional[Dict[str, Any]] = None
     ):
-        """
-        Khởi tạo pipeline.
-
-        Args:
-            base_model_id: ID model Hugging Face để tải CLIP và Tokenizer
-                           (và VAE nếu 'vae_model_id' không được cung cấp).
-            vae_model_id: (Tùy chọn) ID model để tải VAE.
-                          Dùng "stabilityai/sd-vae-ft-mse" cho VAE sắc nét hơn.
-            device: "cpu" hoặc "cuda".
-            config_overrides: Một dict để ghi đè bất kỳ giá trị nào trong
-                              DEFAULT_CONFIG.
-        """
         self.device = torch.device(device)
         
-        # 1. Hợp nhất cấu hình (Config)
-        # Bắt đầu với config mặc định, sau đó ghi đè bằng config_overrides
         self.config = {**self.DEFAULT_CONFIG, **(config_overrides or {})}
 
-        # 2. Tải các thành phần
         print(f"Đang tải Tokenizer và Text Encoder (đã đóng băng) từ {base_model_id}...")
         self.tokenizer = self._load_tokenizer(base_model_id)
         self.text_encoder = self._load_text_encoder(base_model_id)
 
-        # Quyết định tải VAE từ đâu
         _vae_id = vae_model_id or base_model_id
         _vae_subfolder = "vae" if vae_model_id is None else None
         print(f"Đang tải VAE (để fine-tune) từ {_vae_id}...")
@@ -100,7 +80,7 @@ class MiniDiffusionPipeline:
     def _load_text_encoder(self, model_id: str) -> CLIPTextModel:
         model = CLIPTextModel.from_pretrained(model_id, subfolder="text_encoder")
         model.to(self.device)
-        model.requires_grad_(False) # Đóng băng CLIP
+        model.requires_grad_(False)
         return model
 
     def _load_vae(self, model_id: str, subfolder: Optional[str]) -> AutoencoderKL:
@@ -109,13 +89,10 @@ class MiniDiffusionPipeline:
         else:
             model = AutoencoderKL.from_pretrained(model_id)
         model.to(self.device)
-        # Không đóng băng VAE, vì bạn muốn fine-tune nó
         return model
 
     def _load_mini_unet(self) -> UNet2DConditionModel:
-        """Xây dựng config UNet từ self.config và khởi tạo mô hình."""
-        
-        # Tính toán kích thước latent
+
         latent_size = self.config["image_size"] // self.config["latent_downscale_factor"]
         
         unet_config = {
@@ -136,20 +113,15 @@ class MiniDiffusionPipeline:
         return model
 
     def _load_noise_scheduler(self) -> DDPMScheduler:
-        """Khởi tạo scheduler từ self.config."""
-        # DDPMScheduler.from_config sẽ tự động chọn các key
-        # có liên quan từ dict config
         return DDPMScheduler.from_config(self.config)
 
     def print_model_stats(self):
-        """In thông số của các mô hình có thể huấn luyện."""
         unet_params = sum(p.numel() for p in self.unet.parameters() if p.requires_grad)
         vae_params = sum(p.numel() for p in self.vae.parameters() if p.requires_grad)
         print(f"  UNet-mini (để train): {unet_params / 1_000_000:.2f} triệu tham số")
         print(f"  VAE (để fine-tune): {vae_params / 1_000_000:.2f} triệu tham số")
         
     def get_trainable_parameters(self) -> Dict[str, Any]:
-        """Tiện ích trả về các tham số có thể huấn luyện."""
         return {
             "unet": self.unet.parameters(),
             "vae": self.vae.parameters()
@@ -166,26 +138,26 @@ def _run_smoke_test():
     else:
         device = "cuda"
 
-    # --- Kịch bản 1: Tải mặc định (dùng VAE của 1.5) ---
-    print("\n--- Kịch bản 1: Tải mặc định ---")
+    # --- Tải mặc định (dùng VAE của 1.5) ---
+    print("\n--- Tải mặc định ---")
     pipeline_1 = MiniDiffusionPipeline(
         base_model_id="runwayml/stable-diffusion-v1-5",
         device=device
     )
     
-    # --- Kịch bản 2: Tải VAE-MSE (sắc nét hơn) ---
-    print("\n--- Kịch bản 2: Tải VAE-MSE tùy chỉnh ---")
+    # --- Tải VAE-MSE ---
+    print("\n--- Tải VAE-MSE tùy chỉnh ---")
     pipeline_2 = MiniDiffusionPipeline(
-        base_model_id="runwayml/stable-diffusion-v1-5", # Vẫn dùng CLIP/Tokenizer của 1.5
-        vae_model_id="stabilityai/sd-vae-ft-mse",      # Nhưng dùng VAE riêng
+        base_model_id="runwayml/stable-diffusion-v1-5", 
+        vae_model_id="stabilityai/sd-vae-ft-mse",      
         device=device
     )
 
-    # --- Kịch bản 3: Ghi đè config (ví dụ: mô hình nhỏ hơn) ---
-    print("\n--- Kịch bản 3: Ghi đè config (UNet siêu nhỏ) ---")
+    # ---  Ghi đè config ---
+    print("\n--- Ghi đè config (UNet siêu nhỏ) ---")
     tiny_config = {
-        "unet_block_out_channels": (128, 256, 512), # Nhỏ hơn
-        "lr": 5e-5 # Learning rate khác
+        "unet_block_out_channels": (128, 256, 512), 
+        "lr": 5e-5 
     }
     pipeline_3 = MiniDiffusionPipeline(
         base_model_id="runwayml/stable-diffusion-v1-5",
@@ -193,12 +165,10 @@ def _run_smoke_test():
         config_overrides=tiny_config
     )
     
-    print("\n--- Kiểm thử thành công! ---")
-    print(f"Config LR của Pipeline 1: {pipeline_1.config['lr']}") # 1e-4
-    print(f"Config LR của Pipeline 3: {pipeline_3.config['lr']}") # 5e-5
+    print("\n--- Kiểm thử thành công ---")
+    print(f"Config LR của Pipeline 1: {pipeline_1.config['lr']}") 
+    print(f"Config LR của Pipeline 3: {pipeline_3.config['lr']}") 
 
 
 if __name__ == "__main__":
-    # Dòng này đảm bảo code kiểm thử chỉ chạy khi bạn
-    # chạy file này trực tiếp: python mini_pipeline.py
     _run_smoke_test()
