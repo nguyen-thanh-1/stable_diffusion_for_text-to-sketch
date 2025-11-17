@@ -1,6 +1,7 @@
 # Mini-Stable-Diffusion: Lightweight Text-to-Sketch Generator
 
-![Generated Sample](generated_image.png)
+![Generated Sample](generated_image_v1.png)
+![Generated Sample](generated_image_v2.png)
 
 ## Introduction
 
