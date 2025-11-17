@@ -190,7 +190,7 @@ def main():
         safety_checker=None, 
         feature_extractor=None,
     ).to(DEVICE)
-    l
+
     eval_pipeline.set_progress_bar_config(disable=True)
 
     eval_pipeline.unet.eval()
